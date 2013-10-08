@@ -6,7 +6,7 @@ import com.google.android.gms.maps.model.PolygonOptions;
 
 public class PolygonOverlay extends SurfaceOverlay<Polygon> {
 	public void addPolygon(Iterable<LatLng> points) {
-		final Polygon polygon = _map.get().get().addPolygon(new PolygonOptions()
+		final Polygon polygon = _map.get().addPolygon(new PolygonOptions()
 		.addAll(points)
 		.fillColor(_fillColor)
 		.strokeColor(_strokeColor)

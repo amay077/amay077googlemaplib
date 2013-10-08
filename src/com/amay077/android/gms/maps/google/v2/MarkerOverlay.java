@@ -13,7 +13,7 @@ public class MarkerOverlay extends Overlay {
 	private Map<String, Marker> _markers = new HashMap<String, Marker>();
 	
 	public void add(String id, MarkerOptions markerOptions) {
-		Marker marker = _map.get().get().addMarker(markerOptions);
+		Marker marker = _map.get().addMarker(markerOptions);
 		_markers.put(id, marker);
 	}
 	

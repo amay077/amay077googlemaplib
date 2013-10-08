@@ -7,7 +7,7 @@ import com.google.android.gms.maps.model.PolylineOptions;
 public class PolylineOverlay extends GeometryOverlay<Polyline> {
 
 	public void addPolyline(Iterable<LatLng> points) {
-		final Polyline polyline = _map.get().get().addPolyline(new PolylineOptions()
+		final Polyline polyline = _map.get().addPolyline(new PolylineOptions()
 				.addAll(points)
 				.color(_strokeColor)
 				.width(_strokeWitdh));

@@ -46,7 +46,7 @@ public class MapBinder {
 	}
 
 	public void toLocationOverlay(final CurrentLocationOverlay overlay,
-			final IProperty<Location> latestLocation) {
+			final IProperty<Location> p) {
 
 		final LocationSource locationSource = new LocationSource() {
 
@@ -55,7 +55,7 @@ public class MapBinder {
 			@Override
 			public void deactivate() {
 				if (_valueChangedListener != null) {
-					latestLocation.removeListener(_valueChangedListener);
+					p.removeListener(_valueChangedListener);
 					_valueChangedListener = null;
 				}
 			}
@@ -74,84 +74,38 @@ public class MapBinder {
 					}
 				};
 
-				latestLocation.addListener(_valueChangedListener);
+				p.addListener(_valueChangedListener);
 			}
 		};
 
 		overlay.setLocationSource(locationSource);
 		overlay.setMyLocationEnabled(true);
 	}
+	
+	public <T> void toCameraPosition(final IProperty<T> p, final Func1<T, CameraPosition> cameraPosF) {
 
-	public void toCenterLatLon(final IProperty<LatLon> mapCenter,
-			final Binder.BindingType bindingType) {
-
-		mapCenter.addListener(new _OnValueChangedListener<LatLon>() {
+		p.addListener(new _OnValueChangedListener<T>() {
 			@Override
-			public void onChanged(final LatLon l, LatLon oldValue) {
-				runOnViewThread(new Runnable() {
+			public void onChanged(final T newValue, T oldValue) {
+				_activity.get().runOnUiThread(new Runnable() {
+
 					@Override
 					public void run() {
-						if (l == null) {
+						if (newValue == null || cameraPosF == null) {
 							return;
 						}
 
-						_map.animateCamera(CameraUpdateFactory.newLatLng(toLatLng(l)));
+						CameraPosition position = cameraPosF.invoke(newValue);
+						_map.animateCamera(CameraUpdateFactory.newCameraPosition(position));
 					}
 				});
 			}
 		});
-
-		toCenterLocationTwoWay(mapCenter,
-				new Func1<CameraPosition, LatLon>() {
-					@Override
-					public LatLon invoke(CameraPosition cp) {
-						return new LatLon(cp.target.latitude, cp.target.longitude);
-					}
-				},
-				bindingType);
-	}
-	
-	public void toCenterLocation(final IProperty<Location> mapCenter,
-			final Binder.BindingType bindingType) {
-		
-		toCenterLocation(mapCenter, new Func1<Location, LatLon>() {
-			@Override
-			public LatLon invoke(Location l) {
-				return new LatLon(l.getLatitude(), l.getLongitude());
-			}
-		});
-		
-		toCenterLocationTwoWay(mapCenter,
-				new Func1<CameraPosition, Location>() {
-					@Override
-					public Location invoke(CameraPosition cp) {
-						Location l = new Location("");
-						l.setLatitude(cp.target.latitude);
-						l.setLongitude(cp.target.longitude);
-						return l;
-					}
-				},
-				bindingType);
-	}
-	
-	private <T> void toCenterLocationTwoWay(final IProperty<T> mapCenter,
-			final Func1<CameraPosition, T> latlonF,
-			final Binder.BindingType bindingType) {
-		
-		if (bindingType == BindingType.TwoWay) {
-			_map.cameraChanged.add(new EventHandler<CameraPosition>() {
-				@Override
-				public void handle(Object sender, CameraPosition data) {
-					mapCenter._setWithoutFire(latlonF.invoke(data));
-				}
-			});
-		}
 	}
 
+	public <T> void toCenter(final IProperty<T> p, final Func1<T, LatLon> locationF) {
 
-	public <T> void toCenterLocation(final IProperty<T> mapCenter, final Func1<T, LatLon> locationF) {
-
-		mapCenter.addListener(new _OnValueChangedListener<T>() {
+		p.addListener(new _OnValueChangedListener<T>() {
 			@Override
 			public void onChanged(final T newValue, T oldValue) {
 				_activity.get().runOnUiThread(new Runnable() {
@@ -168,6 +122,63 @@ public class MapBinder {
 				});
 			}
 		});
+	}
+
+	public void toCenter(final IProperty<LatLon> p,
+			final Binder.BindingType bindingType) {
+
+		toCenter(p, new Func1<LatLon, LatLon>() {
+			@Override
+			public LatLon invoke(LatLon l) {
+				return l;
+			}
+		});
+
+		_toCenterTwoWay(p,
+				new Func1<CameraPosition, LatLon>() {
+					@Override
+					public LatLon invoke(CameraPosition cp) {
+						return new LatLon(cp.target.latitude, cp.target.longitude);
+					}
+				},
+				bindingType);
+	}
+	
+	public void toCenterLocation(final IProperty<Location> p,
+			final Binder.BindingType bindingType) {
+		
+		toCenter(p, new Func1<Location, LatLon>() {
+			@Override
+			public LatLon invoke(Location l) {
+				return new LatLon(l.getLatitude(), l.getLongitude());
+			}
+		});
+		
+		_toCenterTwoWay(p,
+				new Func1<CameraPosition, Location>() {
+					@Override
+					public Location invoke(CameraPosition cp) {
+						Location l = new Location("");
+						l.setLatitude(cp.target.latitude);
+						l.setLongitude(cp.target.longitude);
+						return l;
+					}
+				},
+				bindingType);
+	}
+	
+	private <T> void _toCenterTwoWay(final IProperty<T> mapCenter,
+			final Func1<CameraPosition, T> latlonF,
+			final Binder.BindingType bindingType) {
+		
+		if (bindingType == BindingType.TwoWay) {
+			_map.cameraChanged.add(new EventHandler<CameraPosition>() {
+				@Override
+				public void handle(Object sender, CameraPosition data) {
+					mapCenter._setWithoutFire(latlonF.invoke(data));
+				}
+			});
+		}
 	}
 
 	public void toMarker(final IProperty<Option<LatLon>> l) {
@@ -308,7 +319,8 @@ public class MapBinder {
 	public <T> void toOverlayMarkers(final ObservableValue<T> p,
 			 final MarkerOverlay overlay, 
 			 final Action2<T, Action2<String, MarkerOptions>> markerApplyer) {
-		p.addListener(new IProperty._OnValueChangedListener<T>() {
+		
+		onChangedOnUiThread(p, new OnValueChangedListener<T>() {
 			@Override
 			public void onChanged(final T newValue, T oldValue) {
 				runOnViewThread(new Runnable() {
@@ -324,6 +336,32 @@ public class MapBinder {
 						};
 						
 						markerApplyer.invoke(newValue, applyer);
+					}
+				});
+			}
+		});
+	}
+
+	public <T> void toOverlayCircles(final ObservableValue<T> p,
+			 final CircleOverlay overlay, 
+			 final Action2<T, Action2<LatLng, Double>> circleApplyer) {
+		
+		onChangedOnUiThread(p, new OnValueChangedListener<T>() {
+			@Override
+			public void onChanged(final T newValue, T oldValue) {
+				runOnViewThread(new Runnable() {
+					@Override
+					public void run() {
+						overlay.clear();
+						
+						Action2<LatLng, Double> applyer = new Action2<LatLng, Double>() {
+							@Override
+							public void invoke(LatLng center, Double radius) {
+								overlay.addCircle(center, radius);
+							}
+						};
+						
+						circleApplyer.invoke(newValue, applyer);
 					}
 				});
 			}

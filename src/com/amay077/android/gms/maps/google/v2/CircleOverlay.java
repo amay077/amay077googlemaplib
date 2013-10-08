@@ -6,7 +6,7 @@ import com.google.android.gms.maps.model.LatLng;
 
 public class CircleOverlay extends SurfaceOverlay<Circle> {
 	public void addCircle(LatLng center, double radiusMetre) {
-		final Circle circle = _map.get().get().addCircle(new CircleOptions()
+		final Circle circle = _map.get().addCircle(new CircleOptions()
 				.center(center)
 				.radius(radiusMetre)
 				.strokeColor(_strokeColor)

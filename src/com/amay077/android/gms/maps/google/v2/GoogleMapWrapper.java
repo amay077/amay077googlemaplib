@@ -31,6 +31,7 @@ public class GoogleMapWrapper {
 
 	public GoogleMapWrapper(GoogleMap map) {
 		_map = new WeakReference<GoogleMap>(map);
+		map.clear();
 		registerEvents();
 	}
 

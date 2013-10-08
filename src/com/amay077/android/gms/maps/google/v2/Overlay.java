@@ -1,13 +1,11 @@
 package com.amay077.android.gms.maps.google.v2;
 
-import java.lang.ref.WeakReference;
-
 import com.amay077.lang.IProperty.OnValueChangedListener;
 import com.amay077.lang.ObservableValue;
 
 
 public abstract class Overlay {
-	protected WeakReference<GoogleMapWrapper> _map;
+	protected GoogleMapWrapper _map;
 	
 	private ObservableValue<Boolean> _visible = new ObservableValue<Boolean>(true);
 	
@@ -36,11 +34,11 @@ public abstract class Overlay {
 	}
 	
 	public void registerMap(GoogleMapWrapper map) {
-		_map = new WeakReference<GoogleMapWrapper>(map);
+		_map = map;
 		onRegisterMap(map);
 	}
 
 	public void unregisterMap() {
-		onUnregisterMap(_map.get());
+		onUnregisterMap(_map);
 	}
 }

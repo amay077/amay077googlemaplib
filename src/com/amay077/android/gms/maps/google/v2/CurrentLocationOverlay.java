@@ -59,7 +59,7 @@ public class CurrentLocationOverlay extends CircleOverlay {
 			.icon(_icon)
 			.anchor(0.5f, 0.5f)
 			.position(new LatLng(l.getLatitude(), l.getLongitude()));
-			_centerMarker = _map.get().get().addMarker(icon);
+			_centerMarker = _map.get().addMarker(icon);
 		} else {
 			_centerMarker.setPosition(new LatLng(l.getLatitude(), l.getLongitude()));
 		}
