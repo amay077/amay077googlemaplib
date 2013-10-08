@@ -1,5 +1,6 @@
 package com.amay077.android.gms.maps.google.v2;
 
+import hu.akarnokd.reactive4java.base.Action2;
 import hu.akarnokd.reactive4java.base.Func1;
 import hu.akarnokd.reactive4java.base.Option;
 
@@ -13,6 +14,7 @@ import com.amay077.android.mvvm.Binder.BindingType;
 import com.amay077.android.types.Animate;
 import com.amay077.android.types.Padding;
 import com.amay077.lang.IProperty;
+import com.amay077.lang.ObservableValue;
 import com.amay077.lang.Event.EventHandler;
 import com.amay077.lang.IProperty.OnValueChangedListener;
 import com.amay077.lang.IProperty._OnValueChangedListener;
@@ -301,6 +303,31 @@ public class MapBinder {
 		
 		overlay.setLocationSource(locationSource);
 		overlay.setMyLocationEnabled(true);
+	}
+	
+	public <T> void toOverlayMarkers(final ObservableValue<T> p,
+			 final MarkerOverlay overlay, 
+			 final Action2<T, Action2<String, MarkerOptions>> markerApplyer) {
+		p.addListener(new IProperty._OnValueChangedListener<T>() {
+			@Override
+			public void onChanged(final T newValue, T oldValue) {
+				runOnViewThread(new Runnable() {
+					@Override
+					public void run() {
+						overlay.clear();
+						
+						Action2<String, MarkerOptions> applyer = new Action2<String, MarkerOptions>() {
+							@Override
+							public void invoke(String key, MarkerOptions m) {
+								overlay.add(key, m);
+							}
+						};
+						
+						markerApplyer.invoke(newValue, applyer);
+					}
+				});
+			}
+		});
 	}
 
 }
