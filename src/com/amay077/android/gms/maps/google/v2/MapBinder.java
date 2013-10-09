@@ -1,14 +1,17 @@
 package com.amay077.android.gms.maps.google.v2;
 
+import hu.akarnokd.reactive4java.base.Action1;
 import hu.akarnokd.reactive4java.base.Action2;
 import hu.akarnokd.reactive4java.base.Func1;
 import hu.akarnokd.reactive4java.base.Option;
 
 import java.lang.ref.WeakReference;
+import java.util.List;
 
 import jp.co.cosmoroot.android.gms.maps.model.LatLon;
 import jp.co.cosmoroot.android.gms.maps.model.LatLonBounds;
 
+import com.amay077.android.mvvm.BaseBinder;
 import com.amay077.android.mvvm.Binder;
 import com.amay077.android.mvvm.Binder.BindingType;
 import com.amay077.android.types.Animate;
@@ -26,23 +29,22 @@ import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
-import android.app.Activity;
 import android.location.Location;
 import android.view.View;
 
-public class MapBinder {
-	private final WeakReference<Activity> _activity;
-	private final GoogleMapWrapper _map;
+public class MapBinder extends BaseBinder {
+	protected final GoogleMapWrapper _map;
 	private final WeakReference<View> _view;
 
 	public MapBinder(SupportMapFragment fragment) {
-		_activity = new WeakReference<Activity>(fragment.getActivity());
+		super(fragment.getActivity());
 		_map = new GoogleMapWrapper(fragment.getMap());
 		_view = new WeakReference<View>(fragment.getView());
 	}
 	
-	private void runOnViewThread(Runnable runnable) {
-		_view.get().post(runnable);
+	@Override
+	protected void runOnUiThread(Runnable runnnable) {
+		_view.get().post(runnnable);
 	}
 
 	public void toLocationOverlay(final CurrentLocationOverlay overlay,
@@ -55,26 +57,21 @@ public class MapBinder {
 			@Override
 			public void deactivate() {
 				if (_valueChangedListener != null) {
-					p.removeListener(_valueChangedListener);
+					unregisterHandler(_valueChangedListener);
 					_valueChangedListener = null;
 				}
 			}
 
 			@Override
 			public void activate(final OnLocationChangedListener listener) {
-				_valueChangedListener = new _OnValueChangedListener<Location>() {
+				_valueChangedListener = new OnValueChangedListener<Location>() {
 					@Override
-					public void onChanged(final Location newValue, Location oldValue) {
-						_activity.get().runOnUiThread(new Runnable() {
-							@Override
-							public void run() {
-								listener.onLocationChanged(newValue);
-							}
-						});
+					public void onChanged(Location newValue, Location oldValue) {
+						listener.onLocationChanged(newValue);
 					}
 				};
 
-				p.addListener(_valueChangedListener);
+				onChangedOnUiThread(p, _valueChangedListener);
 			}
 		};
 
@@ -83,43 +80,30 @@ public class MapBinder {
 	}
 	
 	public <T> void toCameraPosition(final IProperty<T> p, final Func1<T, CameraPosition> cameraPosF) {
-
-		p.addListener(new _OnValueChangedListener<T>() {
+		
+		onChangedOnUiThread(p, new OnValueChangedListener<T>() {
 			@Override
-			public void onChanged(final T newValue, T oldValue) {
-				_activity.get().runOnUiThread(new Runnable() {
+			public void onChanged(T newValue, T oldValue) {
+				if (newValue == null || cameraPosF == null) {
+					return;
+				}
 
-					@Override
-					public void run() {
-						if (newValue == null || cameraPosF == null) {
-							return;
-						}
-
-						CameraPosition position = cameraPosF.invoke(newValue);
-						_map.animateCamera(CameraUpdateFactory.newCameraPosition(position));
-					}
-				});
+				CameraPosition position = cameraPosF.invoke(newValue);
+				_map.animateCamera(CameraUpdateFactory.newCameraPosition(position));
 			}
 		});
 	}
 
 	public <T> void toCenter(final IProperty<T> p, final Func1<T, LatLon> locationF) {
-
-		p.addListener(new _OnValueChangedListener<T>() {
+		onChangedOnUiThread(p, new OnValueChangedListener<T>() {
 			@Override
-			public void onChanged(final T newValue, T oldValue) {
-				_activity.get().runOnUiThread(new Runnable() {
+			public void onChanged(T newValue, T oldValue) {
+				if (newValue == null || locationF == null) {
+					return;
+				}
 
-					@Override
-					public void run() {
-						if (newValue == null || locationF == null) {
-							return;
-						}
-
-						final LatLon l = locationF.invoke(newValue);
-						_map.animateCamera(CameraUpdateFactory.newLatLng(toLatLng(l)));
-					}
-				});
+				final LatLon l = locationF.invoke(newValue);
+				_map.animateCamera(CameraUpdateFactory.newLatLng(toLatLng(l)));
 			}
 		});
 	}
@@ -252,20 +236,6 @@ public class MapBinder {
 			}
 		});
 	}
-
-	private <T> void onChangedOnUiThread(IProperty<T> p, final OnValueChangedListener<T> changeHandler) {
-		p.addListener(new _OnValueChangedListener<T>() {
-			@Override
-			public void onChanged(final T newValue, final T oldValue) {
-				_view.get().post(new Runnable() {
-					@Override
-					public void run() {
-						changeHandler.onChanged(newValue, oldValue);
-					}
-				});
-			}
-		});
-	}
 	
 	private LatLng toLatLng(LatLon l) {
 		return new LatLng(l.lat, l.lon);
@@ -299,12 +269,7 @@ public class MapBinder {
 				_valueChangedListener = new _OnValueChangedListener<Location>() {
 					@Override
 					public void onChanged(final Location newValue, Location oldValue) {
-						runOnViewThread(new Runnable() {
-							@Override
-							public void run() {
-								listener.onLocationChanged(newValue);
-							}
-						});
+						listener.onLocationChanged(newValue);
 					}
 				};
 				
@@ -323,21 +288,16 @@ public class MapBinder {
 		onChangedOnUiThread(p, new OnValueChangedListener<T>() {
 			@Override
 			public void onChanged(final T newValue, T oldValue) {
-				runOnViewThread(new Runnable() {
+				overlay.clear();
+						
+				Action2<String, MarkerOptions> applyer = new Action2<String, MarkerOptions>() {
 					@Override
-					public void run() {
-						overlay.clear();
-						
-						Action2<String, MarkerOptions> applyer = new Action2<String, MarkerOptions>() {
-							@Override
-							public void invoke(String key, MarkerOptions m) {
-								overlay.add(key, m);
-							}
-						};
-						
-						markerApplyer.invoke(newValue, applyer);
+					public void invoke(String key, MarkerOptions m) {
+						overlay.add(key, m);
 					}
-				});
+				};
+				
+				markerApplyer.invoke(newValue, applyer);
 			}
 		});
 	}
@@ -349,23 +309,40 @@ public class MapBinder {
 		onChangedOnUiThread(p, new OnValueChangedListener<T>() {
 			@Override
 			public void onChanged(final T newValue, T oldValue) {
-				runOnViewThread(new Runnable() {
+				overlay.clear();
+				
+				Action2<LatLng, Double> applyer = new Action2<LatLng, Double>() {
 					@Override
-					public void run() {
-						overlay.clear();
-						
-						Action2<LatLng, Double> applyer = new Action2<LatLng, Double>() {
-							@Override
-							public void invoke(LatLng center, Double radius) {
-								overlay.addCircle(center, radius);
-							}
-						};
-						
-						circleApplyer.invoke(newValue, applyer);
+					public void invoke(LatLng center, Double radius) {
+						overlay.addCircle(center, radius);
 					}
-				});
+				};
+				
+				circleApplyer.invoke(newValue, applyer);
 			}
 		});
 	}
+	
+	public <T> void toOverlayPolylines(final ObservableValue<T> p,
+			 final PolylineOverlay overlay, 
+			 final Action2<T, Action1<List<LatLng>>> polylineApplyer) {
+		
+		onChangedOnUiThread(p, new OnValueChangedListener<T>() {
+			@Override
+			public void onChanged(final T newValue, T oldValue) {
+				overlay.clear();
+				
+				Action1<List<LatLng>> applyer = new Action1<List<LatLng>>() {
+					@Override
+					public void invoke(List<LatLng> points) {
+						overlay.addPolyline(points);
+					}
+				};
+				
+				polylineApplyer.invoke(newValue, applyer);
+			}
+		});
+	}
+
 
 }
