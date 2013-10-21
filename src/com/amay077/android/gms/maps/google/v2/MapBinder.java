@@ -2,6 +2,7 @@ package com.amay077.android.gms.maps.google.v2;
 
 import hu.akarnokd.reactive4java.base.Action1;
 import hu.akarnokd.reactive4java.base.Action2;
+import hu.akarnokd.reactive4java.base.Func0;
 import hu.akarnokd.reactive4java.base.Func1;
 import hu.akarnokd.reactive4java.base.Option;
 
@@ -23,6 +24,7 @@ import com.amay077.lang.IProperty.OnValueChangedListener;
 import com.amay077.lang.IProperty._OnValueChangedListener;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
@@ -165,29 +167,17 @@ public class MapBinder extends BaseBinder {
 		}
 	}
 
-	public void toMarker(final IProperty<Option<LatLon>> l) {
-		onChangedOnUiThread(l, new OnValueChangedListener<Option<LatLon>>() {
-			private Marker _marker;
-
+	public void toMarker(final IProperty<Option<LatLon>> l, final Func0<BitmapDescriptor> iconF) {
+		toMarker(l, new Func1<Option<LatLon>, Option<LatLon>>() {
 			@Override
-			public void onChanged(Option<LatLon> newValue,
-					Option<LatLon> oldValue) {
-				if (!Option.isSome(newValue)) {
-					return;
-				}
-				
-				if (_marker != null) {
-					_marker.remove();
-					_marker = null;
-				}
-				
-				LatLng latLng = toLatLng(newValue.value());
-	            _marker = _map.get().addMarker(new MarkerOptions().position(latLng).draggable(false));
+			public Option<LatLon> invoke(Option<LatLon> arg0) {
+				return arg0;
 			}
-		});
+		}, iconF);
 	}
 	
-	public <T> void toMarker(final IProperty<T> p, final Func1<T, Option<LatLon>> converter) {
+	public <T> void toMarker(final IProperty<T> p, final Func1<T, Option<LatLon>> converter,
+			final Func0<BitmapDescriptor> iconF) {
 		onChangedOnUiThread(p, new OnValueChangedListener<T>() {
 			private Marker _marker;
 
@@ -205,7 +195,18 @@ public class MapBinder extends BaseBinder {
 				}
 				
 				LatLng latLng = toLatLng(l.value());
-	            _marker = _map.get().addMarker(new MarkerOptions().position(latLng).draggable(false));
+				MarkerOptions options = new MarkerOptions().position(latLng).draggable(false);
+				
+				BitmapDescriptor descriptor = null;
+				if (iconF != null) {
+					descriptor = iconF.invoke();
+				}
+				
+				if (descriptor != null) {
+					options = options.icon(descriptor);
+				}
+				
+	            _marker = _map.get().addMarker(options);
 			}
 		});
 	}
