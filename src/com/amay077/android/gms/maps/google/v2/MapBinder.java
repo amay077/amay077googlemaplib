@@ -96,7 +96,7 @@ public class MapBinder extends BaseBinder {
 		});
 	}
 
-	public <T> void toCenter(final IProperty<T> p, final Func1<T, LatLon> locationF) {
+	public <T> void toCenter(final IProperty<T> p, final Func1<T, Option<LatLon>> locationF) {
 		onChangedOnUiThread(p, new OnValueChangedListener<T>() {
 			@Override
 			public void onChanged(T newValue, T oldValue) {
@@ -104,8 +104,10 @@ public class MapBinder extends BaseBinder {
 					return;
 				}
 
-				final LatLon l = locationF.invoke(newValue);
-				_map.animateCamera(CameraUpdateFactory.newLatLng(toLatLng(l)));
+				Option<LatLon> l = locationF.invoke(newValue);
+				if (Option.isSome(l)) {
+					_map.animateCamera(CameraUpdateFactory.newLatLng(toLatLng(l.value())));
+				}
 			}
 		});
 	}
@@ -113,10 +115,10 @@ public class MapBinder extends BaseBinder {
 	public void toCenter(final IProperty<LatLon> p,
 			final Binder.BindingType bindingType) {
 
-		toCenter(p, new Func1<LatLon, LatLon>() {
+		toCenter(p, new Func1<LatLon, Option<LatLon>>() {
 			@Override
-			public LatLon invoke(LatLon l) {
-				return l;
+			public Option<LatLon> invoke(LatLon l) {
+				return Option.some(l);
 			}
 		});
 
@@ -133,10 +135,10 @@ public class MapBinder extends BaseBinder {
 	public void toCenterLocation(final IProperty<Location> p,
 			final Binder.BindingType bindingType) {
 		
-		toCenter(p, new Func1<Location, LatLon>() {
+		toCenter(p, new Func1<Location, Option<LatLon>>() {
 			@Override
-			public LatLon invoke(Location l) {
-				return new LatLon(l.getLatitude(), l.getLongitude());
+			public Option<LatLon> invoke(Location l) {
+				return Option.some(new LatLon(l.getLatitude(), l.getLongitude()));
 			}
 		});
 		
