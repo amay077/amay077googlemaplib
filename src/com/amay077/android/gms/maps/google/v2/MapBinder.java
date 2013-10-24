@@ -181,14 +181,42 @@ public class MapBinder extends BaseBinder {
 		}
 	}
 
-	public void toMarker(final IProperty<Option<LatLon>> l, final Func0<BitmapDescriptor> iconF) {
-		toMarker(l, new Func1<Option<LatLon>, Option<LatLon>>() {
+//	public void toMarker(final IProperty<Option<LatLon>> l, final Func0<BitmapDescriptor> iconF) {
+//		toMarker(l, new Func1<Option<LatLon>, Option<LatLon>>() {
+//			@Override
+//			public Option<LatLon> invoke(Option<LatLon> arg0) {
+//				return arg0;
+//			}
+//		}, iconF);
+//	}
+	
+	public <T> void toMarker(final IProperty<T> p, final Func1<T, Option<MarkerSchema>> converter) {
+		onChangedOnUiThread(p, new OnValueChangedListener<T>() {
+			private Marker _marker;
+
 			@Override
-			public Option<LatLon> invoke(Option<LatLon> arg0) {
-				return arg0;
+			public void onChanged(T newValue, T oldValue) {
+				Option<MarkerSchema> s = converter.invoke(newValue);
+				
+				if (!Option.isSome(s)) {
+					return;
+				}
+				
+				if (_marker != null) {
+					_marker.remove();
+					_marker = null;
+				}
+				
+				Option<MarkerOptions> m = toMarkerOptions(s.value());
+				if (Option.isNone(m)) {
+					return;
+				}
+				
+	            _marker = _map.get().addMarker(m.value());
 			}
-		}, iconF);
+		});
 	}
+
 	
 	public <T> void toMarker(final IProperty<T> p, final Func1<T, Option<LatLon>> converter,
 			final Func0<BitmapDescriptor> iconF) {
