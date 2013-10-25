@@ -7,13 +7,11 @@ import hu.akarnokd.reactive4java.base.Option;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import jp.co.cosmoroot.android.gms.maps.BaseMarkerAdapter;
-import jp.co.cosmoroot.android.gms.maps.BaseMarkerAdapter.DataSetObserver;
+import jp.co.cosmoroot.android.gms.maps.MarkerAdapter.DataSetObserver;
 import jp.co.cosmoroot.android.gms.maps.IconDescriptor;
 import jp.co.cosmoroot.android.gms.maps.MarkerSchema;
 import jp.co.cosmoroot.android.gms.maps.model.LatLon;
@@ -232,66 +230,6 @@ public class MapBinder extends BaseBinder {
 	
 	public <T> void toMarker(final IProperty<T> p, final Func1<T, Option<MarkerSchema>> converter) {
 		toMarker(p, converter, null);
-	}
-	
-	public <T, S> void toMarkers(final IProperty<T> p, final Func1<T, Iterable<MarkerSchema>> converter,
-			final SelectCommand<S> command, final Func1<String, Option<S>> inverser) {
-
-		final Map<String, Pair<Marker, MarkerSchema>> markers = new HashMap<String, Pair<Marker, MarkerSchema>>();
-		
-		onChangedOnUiThread(p, new OnValueChangedListener<T>() {
-
-			@Override
-			public void onChanged(T newValue, T oldValue) {
-				for (Pair<Marker, MarkerSchema> p : markers.values()) {
-					p.first.remove();
-				}
-				markers.clear();
-
-				if (converter == null) {
-					return;
-				}
-				
-				Iterable<MarkerSchema> schemas = converter.invoke(newValue);
-				Lambda.iter(schemas, new Action1<MarkerSchema>() {
-					@Override
-					public void invoke(MarkerSchema s) {
-						if (s == null) {
-							return;
-						}
-						
-						Option<MarkerOptions> o = toMarkerOptions(s);
-						if (Option.isNone(o)) {
-							return;
-						}
-						
-						Marker marker = _map.get().addMarker(o.value());
-						markers.put(marker.getId(), new Pair<Marker, MarkerSchema>(marker, s));
-					}
-
-				});
-			}
-		});
-		
-		_map.markerClicked.add(new EventHandler<Marker>() {
-			@Override
-			public void handle(Object sender, Marker data) {
-				
-				if (converter == null) {
-					return;
-				}
-
-				Pair<Marker, MarkerSchema> pair = markers.get(data.getId());
-				if (pair == null || inverser == null) {
-					return;
-				}
-				
-				Option<S> item = inverser.invoke(pair.second.getId());
-				if (item != null && Option.isSome(item)) {
-					executeSelectCommand(command, item.value());
-				}
-			}
-		});
 	}
 	
 	private Option<MarkerOptions> toMarkerOptions(MarkerSchema schema) {
