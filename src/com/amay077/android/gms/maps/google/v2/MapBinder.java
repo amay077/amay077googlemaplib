@@ -6,10 +6,14 @@ import hu.akarnokd.reactive4java.base.Func1;
 import hu.akarnokd.reactive4java.base.Option;
 
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
+import jp.co.cosmoroot.android.gms.maps.BaseMarkerAdapter;
+import jp.co.cosmoroot.android.gms.maps.BaseMarkerAdapter.DataSetObserver;
 import jp.co.cosmoroot.android.gms.maps.IconDescriptor;
 import jp.co.cosmoroot.android.gms.maps.MarkerSchema;
 import jp.co.cosmoroot.android.gms.maps.model.LatLon;
@@ -176,35 +180,58 @@ public class MapBinder extends BaseBinder {
 		}
 	}
 
-	public <T> void toMarker(final IProperty<T> p, final Func1<T, Option<MarkerSchema>> converter) {
+	public <T> void toMarker(final IProperty<T> p, final Func1<T, Option<MarkerSchema>> converter, 
+			final SelectCommand<T> infoWindowClickCommand) {
+		
+		final AtomicReference<Pair<Marker, T>> store = new AtomicReference<Pair<Marker,T>>();
+		
 		onChangedOnUiThread(p, new OnValueChangedListener<T>() {
-			private Marker _marker;
-
 			@Override
 			public void onChanged(T newValue, T oldValue) {
 				Option<MarkerSchema> s = converter.invoke(newValue);
 				
+				Pair<Marker, T> pair = store.get();
+				if (pair != null) {
+					pair.first.remove();
+					store.set(null);
+				}
+
 				if (!Option.isSome(s)) {
 					return;
 				}
-				
-				if (_marker != null) {
-					_marker.remove();
-					_marker = null;
-				}
-				
+
 				Option<MarkerOptions> m = toMarkerOptions(s.value());
 				if (Option.isNone(m)) {
 					return;
 				}
 				
-	            _marker = _map.get().addMarker(m.value());
-	            
+	            Marker marker = _map.get().addMarker(m.value());
+	            store.set(new Pair<Marker, T>(marker, newValue));
 	            if (s.value().isInfoWindowVisible()) {
-	            	_marker.showInfoWindow();
+	            	marker.showInfoWindow();
 				}
 			}
 		});
+		
+		if (infoWindowClickCommand == null) {
+			return;
+		}
+		
+		_map.infoWindowClicked.add(new EventHandler<Marker>() {
+			@Override
+			public void handle(Object sender, Marker data) {
+				Pair<Marker, T> pair = store.get();
+				if (pair == null || pair.first.getId().compareTo(data.getId()) != 0) {
+					return;
+				}
+				
+				executeSelectCommand(infoWindowClickCommand, pair.second);
+			}
+		});
+	}
+	
+	public <T> void toMarker(final IProperty<T> p, final Func1<T, Option<MarkerSchema>> converter) {
+		toMarker(p, converter, null);
 	}
 	
 	public <T, S> void toMarkers(final IProperty<T> p, final Func1<T, Iterable<MarkerSchema>> converter,
@@ -449,5 +476,103 @@ public class MapBinder extends BaseBinder {
 		});
 	}
 
+	
+	public <T> void setMarkerAdapter(final GMarkerAdapter<T> adapter) {
+		adapter.registerDataSetObserver(new DataSetObserver() {
+			private final List<Marker> _markers = new ArrayList<Marker>();
+			
+			@Override
+			public void onChanged() {
+				clearMarkers();
+				
+				for (int i = 0; i < adapter.getCount(); i++) {
+					MarkerSchema s = adapter.getMarkerSchema(i);
+					Option<MarkerOptions> m = toMarkerOptions(s);
+					if (Option.isNone(m)) {
+						continue;
+					}
+					
+					Marker marker = _map.get().addMarker(m.value());
+					_markers.add(marker);
+					adapter.setMarkerId(_markers.size() - 1, marker.getId());
+				}
+			}
 
+			@Override
+			public void onInvalidated() {
+				clearMarkers();
+			}
+			
+			private void clearMarkers() {
+				Lambda.iter(_markers, new Action1<Marker>() {
+					@Override
+					public void invoke(Marker m) {
+						m.remove();
+					}
+				});
+				_markers.clear();
+			}
+		});
+	}
+	
+	public <T> void toMarkerAdapter(final BaseMarkerAdapter<T> adapter, final IProperty<Option<List<T>>> p) {
+		
+		onChangedOnUiThread(p, new OnValueChangedListener<Option<List<T>>>() {
+			@Override
+			public void onChanged(Option<List<T>> newValue, Option<List<T>> oldValue) {
+				adapter.clear();
+				if (Option.isSome(newValue)) {
+					Lambda.iter(newValue.value(), new Action1<T>() {
+						@Override
+						public void invoke(T item) {
+							adapter.add(item);
+						}
+					});
+				}
+				adapter.notifyDataSetChanged();
+			}
+		});
+	}
+	
+	public <T> void toMarkerClickCommand(final GMarkerAdapter<T> adapter, final SelectCommand<T> command) {
+		_map.markerClicked.add(new EventHandler<Marker>() {
+			@Override
+			public void handle(Object sender, Marker data) {
+				
+				int position = adapter.positionForMarkerId(data.getId());
+				
+				if (position < 0) {
+					return;
+				}
+				
+				T item = adapter.getItem(position);
+				if (item == null) {
+					return;
+				}
+			
+				executeSelectCommand(command, item);
+			}
+		});
+	}
+	
+	public <T> void toInfoWindowClickCommand(final GMarkerAdapter<T> adapter, final SelectCommand<T> command) {
+		_map.infoWindowClicked.add(new EventHandler<Marker>() {
+			@Override
+			public void handle(Object sender, Marker data) {
+				
+				int position = adapter.positionForMarkerId(data.getId());
+				
+				if (position < 0) {
+					return;
+				}
+				
+				T item = adapter.getItem(position);
+				if (item == null) {
+					return;
+				}
+			
+				executeSelectCommand(command, item);
+			}
+		});
+	}
 }
