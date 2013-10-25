@@ -7,6 +7,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import com.amay077.lang.Event;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.GoogleMap.CancelableCallback;
 import com.google.android.gms.maps.GoogleMap.OnCameraChangeListener;
 import com.google.android.gms.maps.GoogleMap.OnInfoWindowClickListener;
 import com.google.android.gms.maps.GoogleMap.OnMapClickListener;
@@ -70,7 +71,7 @@ public class GoogleMapWrapper {
 			@Override
 			public boolean onMarkerClick(Marker marker) {
 				markerClicked.fire(GoogleMapWrapper.this, marker);
-				return false;
+				return true;
 			}
 		});
 	}
@@ -81,6 +82,10 @@ public class GoogleMapWrapper {
 
 	public void animateCamera(CameraUpdate cameraUpdate) {
 		_map.get().animateCamera(cameraUpdate);
+	}
+
+	public void animateCamera(CameraUpdate cameraUpdate, int durationMs, CancelableCallback callback) {
+		_map.get().animateCamera(cameraUpdate, durationMs, callback);
 	}
 
 	public void moveCamera(CameraUpdate cameraUpdate) {
@@ -106,5 +111,9 @@ public class GoogleMapWrapper {
 
 	public CameraPosition getCameraPosition() {
 		return _map.get().getCameraPosition();
+	}
+
+	public void stopAnimation() {
+		_map.get().stopAnimation();
 	}
 }
