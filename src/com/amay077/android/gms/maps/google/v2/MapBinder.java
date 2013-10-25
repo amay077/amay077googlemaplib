@@ -29,7 +29,9 @@ import com.amay077.lang.ObservableValue;
 import com.amay077.lang.Event.EventHandler;
 import com.amay077.lang.IProperty.OnValueChangedListener;
 import com.amay077.lang.IProperty._OnValueChangedListener;
+import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap.CancelableCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
@@ -39,6 +41,7 @@ import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
+import android.graphics.Region.Op;
 import android.location.Location;
 import android.util.Pair;
 import android.view.View;
@@ -90,7 +93,7 @@ public class MapBinder extends BaseBinder {
 		overlay.setMyLocationEnabled(true);
 	}
 	
-	public <T> void toCameraPosition(final IProperty<T> p, final Func1<T, CameraPosition> cameraPosF) {
+	public <T> void toCameraPosition(final IProperty<T> p, final Func1<T, Option<CameraPosition>> cameraPosF) {
 		
 		onChangedOnUiThread(p, new OnValueChangedListener<T>() {
 			@Override
@@ -99,10 +102,57 @@ public class MapBinder extends BaseBinder {
 					return;
 				}
 
-				CameraPosition position = cameraPosF.invoke(newValue);
-				_map.animateCamera(CameraUpdateFactory.newCameraPosition(position));
+				Option<CameraPosition> position = cameraPosF.invoke(newValue);
+				if (Option.isSome(position)) {
+					animateMapCamera(CameraUpdateFactory.newCameraPosition(position.value()));
+				}
 			}
 		});
+	}
+
+	public <T> void toCameraUpdate(final IProperty<T> p, final Func1<T, Option<CameraUpdate>> cameraPosF) {
+		
+		onChangedOnUiThread(p, new OnValueChangedListener<T>() {
+			@Override
+			public void onChanged(T newValue, T oldValue) {
+				if (newValue == null || cameraPosF == null) {
+					return;
+				}
+
+				Option<CameraUpdate> position = cameraPosF.invoke(newValue);
+				if (Option.isSome(position)) {
+					animateMapCamera(position.value());
+				}
+			}
+		});
+	}
+
+	private final Action1<CameraUpdate> _cameraUpdator = new Action1<CameraUpdate>() {
+		@Override
+		public void invoke(CameraUpdate update) {
+			_map.stopAnimation();
+			_map.animateCamera(update, 200, new CancelableCallback() {
+				@Override
+				public void onFinish() {
+				}
+				
+				@Override
+				public void onCancel() {
+				}
+			});
+		}
+	};
+	
+	private void updateMapCamera(CameraUpdate update, Animate animate) {
+		if (animate == Animate.OFF) {
+			_map.moveCamera(update);
+		} else if (animate == Animate.ON) {
+			_cameraUpdator.invoke(update);
+		}
+	}
+	
+	private void animateMapCamera(CameraUpdate update) {
+		updateMapCamera(update, Animate.ON);
 	}
 
 	public <T> void toCenter(final IProperty<T> p, final Func1<T, Option<LatLon>> locationF) {
@@ -115,7 +165,7 @@ public class MapBinder extends BaseBinder {
 
 				Option<LatLon> l = locationF.invoke(newValue);
 				if (Option.isSome(l)) {
-					_map.animateCamera(CameraUpdateFactory.newLatLng(toLatLng(l.value())));
+					animateMapCamera(CameraUpdateFactory.newLatLng(toLatLng(l.value())));
 				}
 			}
 		});
@@ -296,13 +346,8 @@ public class MapBinder extends BaseBinder {
 			public void onChanged(T newValue, T oldValue) {
 				Option<LatLonBounds> b = converter.invoke(newValue);
 				
-				if (animate == Animate.ON) {
-					_map.animateCamera(CameraUpdateFactory.newLatLngBounds(
-							toLatLngBounds(b.value()), padding.value()));
-				} else {
-					_map.moveCamera(CameraUpdateFactory.newLatLngBounds(
-							toLatLngBounds(b.value()), padding.value()));
-				}
+				updateMapCamera(CameraUpdateFactory.newLatLngBounds(
+						toLatLngBounds(b.value()), padding.value()), animate);
 			}
 		});
 	}
@@ -487,12 +532,12 @@ public class MapBinder extends BaseBinder {
 				if (item == null) {
 					return;
 				}
-			
+				
 				executeSelectCommand(command, item);
 			}
 		});
 	}
-	
+
 	public <T> void toInfoWindowClickCommand(final GMarkerAdapter<T> adapter, final SelectCommand<T> command) {
 		_map.infoWindowClicked.add(new EventHandler<Marker>() {
 			@Override
